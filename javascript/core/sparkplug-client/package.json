@@ -1,6 +1,6 @@
 {
-  "name": "sparkplug-client",
-  "version": "3.2.2",
+  "name": "@nortech/sparkplug-client",
+  "version": "3.2.4",
   "description": "A client module for MQTT communication using the Sparkplug specification from Cirrus Link Solutions",
   "main": "index.js",
   "scripts": {
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eclipse/tahu.git"
+    "url": "git+https://github.com/nortech.ai/tahu.git"
   },
   "keywords": [
     "tahu",
@@ -19,16 +19,18 @@
   "author": "Chad Kienle <chad.kienle@cirrus-link.com> (http://www.cirrus-link.com)",
   "license": "EPL-2.0",
   "bugs": {
-    "url": "https://github.com/eclipse/tahu/issues"
+    "url": "https://github.com/nortech.ai/tahu/issues"
   },
-  "homepage": "https://github.com/eclipse/tahu",
+  "homepage": "https://github.com/nortech.ai/tahu",
   "files": [
     "index.js",
+    "index.d.ts",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
-    "mqtt": "^4.2.8",
+    "@types/winston": "^2.4.4",
+    "mqtt": "^4.3.7",
     "pako": "^2.0.4",
     "sparkplug-payload": "^1.0.1",
     "winston": "^3.3.3"
