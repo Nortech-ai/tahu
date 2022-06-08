@@ -11,13 +11,13 @@
  *   Cirrus Link Solutions - initial implementation
  ********************************************************************************/
 
-var sparkplugbpayload = require('./lib/sparkplugbpayload.js');
+import * as sparkplugbpayload from "./lib/sparkplugbpayload"
 
-exports.get = function(namespace) {
-    if (namespace !== undefined && namespace !== null) {
-        if (namespace === "spBv1.0") {
-            return sparkplugbpayload;
-        }
+exports.get = function (namespace: "spBv1.0") {
+  if (namespace !== undefined && namespace !== null) {
+    if (namespace === "spBv1.0") {
+      return sparkplugbpayload
     }
-    return null;
-};
+  }
+  return null
+}

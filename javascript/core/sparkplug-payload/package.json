@@ -1,8 +1,12 @@
 {
-  "name": "sparkplug-payload",
+  "name": "@nortech/sparkplug-payload",
   "version": "1.0.1",
   "description": "A library for encoding and decoding Sparkplug payloads",
   "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eclipse/tahu.git"
@@ -20,12 +24,17 @@
   },
   "homepage": "https://github.com/eclipse/tahu",
   "files": [
+    "index.d.ts",
     "index.js",
     "lib/sparkplugbpayload.js",
+    "lib/sparkplugbpayload.d.ts",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
     "protobufjs": "^6.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.7.3"
   }
 }

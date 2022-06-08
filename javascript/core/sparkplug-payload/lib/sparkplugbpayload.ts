@@ -14,7 +14,7 @@
 /**
  * Provides support for generating Kura payloads.
  */
-(function () {
+
     var ProtoBuf = require("protobufjs");
 
     var SparkplugPayload = ProtoBuf.parse("package org.eclipse.tahu.protobuf; message Payload { message Template { " +
@@ -58,7 +58,7 @@
     /**
      * Sets the value of an object given it's type expressed as an integer
      */
-    setValue = function(type, value, object) {
+    var setValue = function(type, value, object) {
         switch (type) {
             case 1: // Int8
             case 2: // Int16
@@ -106,7 +106,7 @@
         } 
     }
 
-    getValue = function(type, object) {
+    var getValue = function(type, object) {
         switch (type) {
             case 1: // Int8
             case 2: // Int16
@@ -148,7 +148,7 @@
         } 
     }
 
-    encodeType = function(typeString) {
+    var encodeType = function(typeString) {
         switch (typeString.toUpperCase()) {
             case "INT8":
                 return 1;
@@ -199,7 +199,7 @@
         }
     }
 
-    decodeType = function(typeInt) {
+    var decodeType = function(typeInt) {
         switch (typeInt) {
             case 1:
                 return "Int8";
@@ -246,7 +246,7 @@
         }
     }
 
-    encodeTypes = function(typeArray) {
+    var encodeTypes = function(typeArray) {
         var types = [];
         for (var i = 0; i < typeArray.length; i++) {
             types.push(encodeType(typeArray[i]));
@@ -254,7 +254,7 @@
         return types;
     }
 
-    decodeTypes = function(typeArray) {
+    var decodeTypes = function(typeArray) {
         var types = [];
         for (var i = 0; i < typeArray.length; i++) {
             types.push(decodeType(typeArray[i]));
@@ -262,7 +262,7 @@
         return types;
     }
 
-    encodeDataSet = function(object) {
+    var encodeDataSet = function(object) {
         var num = object.numOfColumns,
             names = object.columns,
             types = encodeTypes(object.types),
@@ -276,8 +276,8 @@
         // Loop over all the rows
         for (var i = 0; i < rows.length; i++) {
             var newRow = Row.create();
-                row = rows[i];
-                elements = [];
+                let row = rows[i];
+                let elements = [];
             // Loop over all the elements in each row
             for (var t = 0; t < num; t++) {
                 var newValue = DataSetValue.create();
@@ -291,8 +291,8 @@
         return newDataSet;
     }
 
-    decodeDataSet = function(protoDataSet) {
-        var dataSet = {},
+    var decodeDataSet = function(protoDataSet) {
+        var dataSet: any = {},
             protoTypes = protoDataSet.types,
             types = decodeTypes(protoTypes),
             protoRows = protoDataSet.rows,
@@ -319,7 +319,7 @@
         return dataSet;
     }
 
-    encodeMetaData = function(object) {
+    var encodeMetaData = function(object) {
         var metadata = MetaData.create(),
             isMultiPart = object.isMultiPart,
             contentType = object.contentType,
@@ -365,8 +365,8 @@
         return metadata;
     }
 
-    decodeMetaData = function(protoMetaData) {
-        var metadata = {},
+    var decodeMetaData = function(protoMetaData) {
+        var metadata: any = {},
             isMultiPart = protoMetaData.isMultiPart,
             contentType = protoMetaData.contentType,
             size = protoMetaData.size,
@@ -411,7 +411,7 @@
         return metadata;
     }
 
-    encodePropertyValue = function(object) {
+    var encodePropertyValue = function(object) {
         var type = encodeType(object.type),
             newPropertyValue = PropertyValue.create({
                 "type" : type
@@ -426,8 +426,8 @@
         return newPropertyValue;
     }
 
-    decodePropertyValue = function(protoValue) {
-        var propertyValue = {};
+    var decodePropertyValue = function(protoValue) {
+        var propertyValue: any = {};
 
         if (protoValue.isNull !== undefined && protoValue.isNull === true) {
             propertyValue.value = null;
@@ -440,7 +440,7 @@
         return propertyValue;
     }
 
-    encodePropertySet = function(object) {
+    var encodePropertySet = function(object) {
         var keys = [],
             values = [];
 
@@ -457,7 +457,7 @@
         });
     }
 
-    decodePropertySet = function(protoSet) {
+    var decodePropertySet = function(protoSet) {
         var propertySet = {},
             protoKeys = protoSet.keys,
             protoValues = protoSet.values;
@@ -469,7 +469,7 @@
         return propertySet;
     }
 
-    encodePropertySetList = function(object) {
+    var encodePropertySetList = function(object) {
         var propertySets = [];
         for (var i = 0; i < object.length; i++) {
             propertySets.push(encodePropertySet(object[i]));
@@ -479,7 +479,7 @@
         });
     }
 
-    decodePropertySetList = function(protoSetList) {
+    var decodePropertySetList = function(protoSetList) {
         var propertySets = [],
             protoSets = protoSetList.propertyset;
         for (var i = 0; i < protoSets.length; i++) {
@@ -488,7 +488,7 @@
         return propertySets;
     }
 
-    encodeParameter = function(object) {
+    var encodeParameter = function(object) {
         var type = encodeType(object.type),
             newParameter = Parameter.create({
                 "name" : object.name, 
@@ -498,9 +498,9 @@
         return newParameter;
     }
 
-    decodeParameter = function(protoParameter) {
+    var decodeParameter = function(protoParameter) {
         var protoType = protoParameter.type,
-            parameter = {};
+            parameter: any = {};
 
         parameter.name = protoParameter.name;
         parameter.type = decodeType(protoType);
@@ -509,7 +509,7 @@
         return parameter;
     }
 
-    encodeTemplate = function(object) {
+    var encodeTemplate = function(object) {
         var template = Template.create(),
             metrics = object.metrics,
             parameters = object.parameters,
@@ -553,8 +553,8 @@
         return template;
     }
 
-    decodeTemplate = function(protoTemplate) {
-        var template = {},
+    var decodeTemplate = function(protoTemplate) {
+        var template: any = {},
             protoMetrics = protoTemplate.metrics,
             protoParameters = protoTemplate.parameters,
             isDef = protoTemplate.isDefinition,
@@ -596,7 +596,7 @@
         return template;
     }
 
-    encodeMetric = function(metric) {
+    var encodeMetric = function(metric) {
         var newMetric = Metric.create({
                 "name" : metric.name
             }),
@@ -644,8 +644,8 @@
         return newMetric;
     }
 
-    decodeMetric = function(protoMetric) {
-        var metric = {},
+    var decodeMetric = function(protoMetric) {
+        var metric: any = {},
             alias = protoMetric.alias,
             isHistorical = protoMetric.isHistorical,
             isTransient = protoMetric.isTransient,
@@ -691,7 +691,7 @@
         return metric;
     }
 
-    exports.encodePayload = function(object) {
+    export const encodePayload = function(object) {
         var payload = Payload.create({
             "timestamp" : object.timestamp
         });
@@ -722,16 +722,16 @@
         return Payload.encode(payload).finish();
     }
 
-    exports.decodePayload = function(proto) {
+    export const decodePayload = function(proto) {
         var sparkplugPayload = Payload.decode(proto),
-            payload = {};
+            payload: any = {};
 
         if (sparkplugPayload.hasOwnProperty("timestamp")) {
             payload.timestamp = sparkplugPayload.timestamp.toNumber();
         }
 
         if (sparkplugPayload.hasOwnProperty("metrics")) {
-            metrics = [];
+            let metrics = [];
             for (var i = 0; i < sparkplugPayload.metrics.length; i++) {
                 metrics.push(decodeMetric(sparkplugPayload.metrics[i]));
             }
@@ -752,7 +752,6 @@
 
         return payload;
     }
-}());
 
 
 
