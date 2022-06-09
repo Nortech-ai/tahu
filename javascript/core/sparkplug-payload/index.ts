@@ -13,11 +13,15 @@
 
 import * as sparkplugbpayload from "./lib/sparkplugbpayload"
 
-exports.get = function (namespace: "spBv1.0") {
+export const get = function (namespace: "spBv1.0") {
   if (namespace !== undefined && namespace !== null) {
     if (namespace === "spBv1.0") {
       return sparkplugbpayload
     }
   }
   return null
+}
+
+export default {
+  get,
 }
