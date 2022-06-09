@@ -142,7 +142,7 @@ class SparkplugClient extends events.EventEmitter {
     };
 
     private decodePayload(payload): any {
-        return sparkplugbpayload.decodePayload(payload);
+        return decodePayload(payload);
     }
 
     private addSeqNumber(payload): void {
@@ -221,31 +221,6 @@ class SparkplugClient extends events.EventEmitter {
         return resultPayload;
     }
 
-    private decompressPayload(payload) {
-        let metrics = payload.metrics,
-            algorithm = null;
-
-        logger.debug("Decompressing payload");
-
-        if (metrics !== undefined && metrics !== null) {
-            for (let i = 0; i < metrics.length; i++) {
-                if (metrics[i].name === "algorithm") {
-                    algorithm = metrics[i].value;
-                }
-            }
-        }
-
-        if (algorithm === null || algorithm.toUpperCase() === "DEFLATE") {
-            logger.debug("Decompressing with DEFLATE!");
-            return pako.inflate(payload.body);
-        } else if (algorithm.toUpperCase() === "GZIP") {
-            logger.debug("Decompressing with GZIP");
-            return pako.ungzip(payload.body);
-        } else {
-            throw new Error("Unknown or unsupported algorithm " + algorithm);
-        }
-    }
-
     private maybeCompressPayload(payload, options) {
         if (options !== undefined && options !== null && options.compress) {
             // Compress the payload
@@ -257,13 +232,7 @@ class SparkplugClient extends events.EventEmitter {
     }
 
     private maybeDecompressPayload(payload) {
-        if (payload.uuid !== undefined && payload.uuid === compressed) {
-            // Decompress the payload
-            return this.decodePayload(this.decompressPayload(payload));
-        } else {
-            // The payload is not compressed
-            return payload;
-        }
+        return maybeDecompressPayload(payload);
     }
 
     subscribeTopic(topic: string, options = { "qos": 0 }, callback?) {
@@ -465,4 +434,41 @@ class SparkplugClient extends events.EventEmitter {
 
 export function newClient(config: ISparkplugClientOptions): SparkplugClient {
     return new SparkplugClient(config);
+}
+
+export function maybeDecompressPayload(payload: { uuid?: string }) {
+    if (payload.uuid !== undefined && payload.uuid === compressed) {
+        // Decompress the payload
+        return decodePayload(decompressPayload(payload));
+    } else {
+        // The payload is not compressed
+        return payload;
+    }
+}
+function decompressPayload(payload) {
+    let metrics = payload.metrics,
+        algorithm = null;
+
+    logger.debug("Decompressing payload");
+
+    if (metrics !== undefined && metrics !== null) {
+        for (let i = 0; i < metrics.length; i++) {
+            if (metrics[i].name === "algorithm") {
+                algorithm = metrics[i].value;
+            }
+        }
+    }
+
+    if (algorithm === null || algorithm.toUpperCase() === "DEFLATE") {
+        logger.debug("Decompressing with DEFLATE!");
+        return pako.inflate(payload.body);
+    } else if (algorithm.toUpperCase() === "GZIP") {
+        logger.debug("Decompressing with GZIP");
+        return pako.ungzip(payload.body);
+    } else {
+        throw new Error("Unknown or unsupported algorithm " + algorithm);
+    }
+}
+function decodePayload (payload) {
+    return sparkplugbpayload.decodePayload(payload);
 }
