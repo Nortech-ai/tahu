@@ -9,9 +9,9 @@
  * Contributors:
  *   Cirrus Link Solutions
  */
-import * as mqtt from 'mqtt';
-import type { IClientOptions } from 'mqtt';
 import events from 'events';
+import type { IClientOptions } from 'mqtt';
+import * as mqtt from 'mqtt';
 
 const sparkplug = require('sparkplug-payload'),
     sparkplugbpayload = sparkplug.get("spBv1.0"),
@@ -25,7 +25,7 @@ const logger = winston.createLogger({
     level: 'warn',
     format: winston.format.json(),
     transports: [
-      new winston.transports.File({ filename: 'logfile.log' })
+      //new winston.transports.File({ filename: 'logfile.log' })
     ]
 });
 
