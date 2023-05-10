@@ -1,6 +1,6 @@
 {
   "name": "@nortech/sparkplug-client",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "description": "A client module for MQTT communication using the Sparkplug specification from Cirrus Link Solutions",
   "main": "index.js",
   "scripts": {
