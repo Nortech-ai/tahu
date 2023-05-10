@@ -298,7 +298,11 @@ class SparkplugClient extends events.EventEmitter {
   }
 
   // Publishes Node BIRTH certificates for the edge node
-  publishNodeBirth(payload: UPayload, options?: PayloadOptions) {
+  publishNodeBirth(
+    payload: UPayload,
+    options?: PayloadOptions,
+    cb?: mqtt.PacketCallback
+  ) {
     let topic = this.version + "/" + this.groupId + "/NBIRTH/" + this.edgeNode;
     // Reset sequence number
     this.seq = 0;
@@ -317,12 +321,16 @@ class SparkplugClient extends events.EventEmitter {
     // Publish BIRTH certificate for edge node
     logger.info("Publishing Edge Node Birth");
     let p = this.maybeCompressPayload(payload, options);
-    this.client!.publish(topic, Buffer.from(this.encodePayload(p)));
+    this.client!.publish(topic, Buffer.from(this.encodePayload(p)), cb);
     this.messageAlert("published", topic, p);
   }
 
   // Publishes Node Data messages for the edge node
-  publishNodeData(payload: UPayload, options?: PayloadOptions) {
+  publishNodeData(
+    payload: UPayload,
+    options?: PayloadOptions,
+    cb?: mqtt.PacketCallback
+  ) {
     let topic = this.version + "/" + this.groupId + "/NDATA/" + this.edgeNode;
     // Add seq number
     this.addSeqNumber(payload);
@@ -332,7 +340,8 @@ class SparkplugClient extends events.EventEmitter {
       topic,
       Buffer.from(
         this.encodePayload(this.maybeCompressPayload(payload, options))
-      )
+      ),
+      cb
     );
     this.messageAlert("published", topic, payload);
   }
@@ -341,7 +350,8 @@ class SparkplugClient extends events.EventEmitter {
   publishDeviceData(
     deviceId: string,
     payload: UPayload,
-    options?: PayloadOptions
+    options?: PayloadOptions,
+    cb?: mqtt.PacketCallback
   ) {
     let topic =
       this.version +
@@ -359,7 +369,8 @@ class SparkplugClient extends events.EventEmitter {
       topic,
       Buffer.from(
         this.encodePayload(this.maybeCompressPayload(payload, options))
-      )
+      ),
+      cb
     );
     this.messageAlert("published", topic, payload);
   }
@@ -368,7 +379,8 @@ class SparkplugClient extends events.EventEmitter {
   publishDeviceBirth(
     deviceId: string,
     payload: UPayload,
-    options?: PayloadOptions
+    options?: PayloadOptions,
+    cb?: mqtt.PacketCallback
   ) {
     let topic =
       this.version +
@@ -383,7 +395,7 @@ class SparkplugClient extends events.EventEmitter {
     // Publish
     logger.info("Publishing DBIRTH for device " + deviceId);
     let p = this.maybeCompressPayload(payload, options);
-    this.client!.publish(topic, Buffer.from(this.encodePayload(p)));
+    this.client!.publish(topic, Buffer.from(this.encodePayload(p)), cb);
     this.messageAlert("published", topic, p);
   }
 
