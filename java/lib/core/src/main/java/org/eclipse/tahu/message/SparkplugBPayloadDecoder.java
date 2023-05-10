@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2014, 2018 Cirrus Link Solutions and others
+ * Copyright (c) 2014-2022 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -16,6 +16,7 @@ package org.eclipse.tahu.message;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -44,6 +45,7 @@ import org.eclipse.tahu.message.model.SparkplugBPayload.SparkplugBPayloadBuilder
 import org.eclipse.tahu.message.model.Template;
 import org.eclipse.tahu.message.model.Template.TemplateBuilder;
 import org.eclipse.tahu.message.model.Value;
+import org.eclipse.tahu.model.MetricDataTypeMap;
 import org.eclipse.tahu.protobuf.SparkplugBProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,11 +57,15 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 
 	private static final Logger logger = LoggerFactory.getLogger(SparkplugBPayloadDecoder.class.getName());
 
+	/**
+	 * Default Constructor
+	 */
 	public SparkplugBPayloadDecoder() {
 		super();
 	}
 
-	public SparkplugBPayload buildFromByteArray(byte[] bytes) throws Exception {
+	@Override
+	public SparkplugBPayload buildFromByteArray(byte[] bytes, MetricDataTypeMap metricDataTypeMap) throws Exception {
 		SparkplugBProto.Payload protoPayload = SparkplugBProto.Payload.parseFrom(bytes);
 		SparkplugBPayloadBuilder builder = new SparkplugBPayloadBuilder();
 
@@ -75,7 +81,7 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 
 		// Set the Metrics
 		for (SparkplugBProto.Payload.Metric protoMetric : protoPayload.getMetricsList()) {
-			builder.addMetric(convertMetric(protoMetric));
+			builder.addMetric(convertMetric(protoMetric, metricDataTypeMap, null));
 		}
 
 		// Set the body
@@ -91,13 +97,30 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 		return builder.createPayload();
 	}
 
-	private Metric convertMetric(SparkplugBProto.Payload.Metric protoMetric) throws Exception {
+	private Metric convertMetric(SparkplugBProto.Payload.Metric protoMetric, MetricDataTypeMap metricDataTypeMap,
+			String prefix) throws Exception {
 		// Convert the dataType
 		MetricDataType dataType = MetricDataType.fromInteger((protoMetric.getDatatype()));
+		if (dataType == MetricDataType.Unknown) {
+			if (metricDataTypeMap != null && !metricDataTypeMap.isEmpty()) {
+				if (protoMetric.hasName()) {
+					dataType = metricDataTypeMap
+							.getMetricDataType(prefix != null ? prefix + protoMetric.getName() : protoMetric.getName());
+				} else if (protoMetric.hasAlias()) {
+					dataType = metricDataTypeMap.getMetricDataType(protoMetric.getAlias());
+				} else {
+					logger.error("Failed to decode the payload on metric: {}", protoMetric);
+					return null;
+				}
+			} else {
+				logger.error("Failed to decode the payload on metric datatype: {}", protoMetric);
+				return null;
+			}
+		}
 
 		// Build and return the Metric
 		return new MetricBuilder(protoMetric.hasName() ? protoMetric.getName() : null, dataType,
-				getMetricValue(protoMetric))
+				getMetricValue(protoMetric, metricDataTypeMap, prefix))
 						.isHistorical(protoMetric.hasIsHistorical() ? protoMetric.getIsHistorical() : null)
 						.isTransient(
 								protoMetric.hasIsTransient() ? protoMetric.getIsTransient() : null)
@@ -157,10 +180,17 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 			case UInt16:
 				return value.getIntValue();
 			case UInt32:
+				if (value.hasIntValue()) {
+					return Integer.toUnsignedLong(value.getIntValue());
+				} else if (value.hasLongValue()) {
+					return value.getLongValue();
+				} else {
+					logger.error("Invalid value for UInt32 datatype");
+				}
 			case Int64:
 				return value.getLongValue();
 			case UInt64:
-				return BigInteger.valueOf(value.getLongValue());
+				return new BigInteger(Long.toUnsignedString(value.getLongValue()));
 			case String:
 			case Text:
 				return value.getStringValue();
@@ -181,13 +211,35 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 		}
 	}
 
-	private Object getMetricValue(SparkplugBProto.Payload.Metric protoMetric) throws Exception {
+	private Object getMetricValue(SparkplugBProto.Payload.Metric protoMetric, MetricDataTypeMap metricDataTypeMap,
+			String prefix) throws Exception {
 		// Check if the null flag has been set indicating that the value is null
 		if (protoMetric.getIsNull()) {
 			return null;
 		}
-		// Otherwise convert the value based on the type
+
+		// Get the MetricDataType
 		int metricType = protoMetric.getDatatype();
+		if (metricType == 0) {
+			if (metricDataTypeMap != null && !metricDataTypeMap.isEmpty()) {
+				if (protoMetric.hasName()) {
+					metricType = metricDataTypeMap
+							.getMetricDataType(prefix != null ? prefix + protoMetric.getName() : protoMetric.getName())
+							.toIntValue();
+				} else if (protoMetric.hasAlias()) {
+					metricType = metricDataTypeMap.getMetricDataType(protoMetric.getAlias()).toIntValue();
+				} else {
+					logger.error("Failed to decode the payload on metric: {}", protoMetric);
+					return null;
+				}
+			} else {
+				logger.error("Failed to decode the payload on metric datatype: {}", protoMetric);
+				return null;
+			}
+		}
+
+		logger.trace("For metricName={} and alias={} - handling metric type in decoder: {}", protoMetric.getName(),
+				protoMetric.getAlias(), metricType);
 		switch (MetricDataType.fromInteger(metricType)) {
 			case Boolean:
 				return protoMetric.getBooleanValue();
@@ -210,10 +262,17 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 			case UInt16:
 				return protoMetric.getIntValue();
 			case UInt32:
+				if (protoMetric.hasIntValue()) {
+					return Integer.toUnsignedLong(protoMetric.getIntValue());
+				} else if (protoMetric.hasLongValue()) {
+					return protoMetric.getLongValue();
+				} else {
+					logger.error("Invalid value for UInt32 datatype");
+				}
 			case Int64:
 				return protoMetric.getLongValue();
 			case UInt64:
-				return BigInteger.valueOf(protoMetric.getLongValue());
+				return new BigInteger(Long.toUnsignedString(protoMetric.getLongValue()));
 			case String:
 			case Text:
 			case UUID:
@@ -245,7 +304,8 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 				}
 
 				for (SparkplugBProto.Payload.Metric protoTemplateMetric : protoTemplate.getMetricsList()) {
-					Metric templateMetric = convertMetric(protoTemplateMetric);
+					Metric templateMetric = convertMetric(protoTemplateMetric, metricDataTypeMap,
+							prefix != null ? prefix + protoMetric.getName() + "/" : protoMetric.getName() + "/");
 					if (logger.isTraceEnabled()) {
 						logger.trace("Setting template parameter name: " + templateMetric.getName() + ", type: "
 								+ templateMetric.getDataType() + ", value: " + templateMetric.getValue());
@@ -301,6 +361,42 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 					int64List.add(value);
 				}
 				return int64List.toArray(new Long[0]);
+			case UInt8Array:
+				ByteBuffer uInt8ByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<Short> uInt8List = new ArrayList<>();
+				uInt8ByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				while (uInt8ByteBuffer.hasRemaining()) {
+					byte value = uInt8ByteBuffer.get();
+					uInt8List.add(value >= 0 ? (short) value : (short) (0x10000 + value));
+				}
+				return uInt8List.toArray(new Short[0]);
+			case UInt16Array:
+				ByteBuffer uInt16ByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<Integer> uInt16List = new ArrayList<>();
+				uInt16ByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				while (uInt16ByteBuffer.hasRemaining()) {
+					short value = uInt16ByteBuffer.getShort();
+					uInt16List.add(Short.toUnsignedInt(value));
+				}
+				return uInt16List.toArray(new Integer[0]);
+			case UInt32Array:
+				ByteBuffer uInt32ByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<Long> uInt32List = new ArrayList<>();
+				uInt32ByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				while (uInt32ByteBuffer.hasRemaining()) {
+					int value = uInt32ByteBuffer.getInt();
+					uInt32List.add(Integer.toUnsignedLong(value));
+				}
+				return uInt32List.toArray(new Long[0]);
+			case UInt64Array:
+				ByteBuffer uInt64ByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<BigInteger> uInt64List = new ArrayList<>();
+				uInt64ByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				while (uInt64ByteBuffer.hasRemaining()) {
+					long value = uInt64ByteBuffer.getLong();
+					uInt64List.add(new BigInteger(Long.toUnsignedString(value)));
+				}
+				return uInt64List.toArray(new BigInteger[0]);
 			case FloatArray:
 				ByteBuffer floatByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
 				List<Float> floatList = new ArrayList<>();
@@ -342,6 +438,35 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 					}
 				}
 				return booleanList.toArray(new Boolean[0]);
+			case StringArray:
+				ByteBuffer stringByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<String> stringList = new ArrayList<>();
+				stringByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				ByteBuffer subByteBuffer = ByteBuffer.allocate(protoMetric.getBytesValue().toByteArray().length);
+				while (stringByteBuffer.hasRemaining()) {
+					byte b = stringByteBuffer.get();
+					if (b == (byte) 0) {
+						String string = new String(subByteBuffer.array(), StandardCharsets.UTF_8);
+						if (string != null && string.lastIndexOf("\0") == string.length() - 1) {
+							string = string.replace("\0", "");
+						}
+						stringList.add(string);
+						subByteBuffer = ByteBuffer.allocate(protoMetric.getBytesValue().toByteArray().length);
+					} else {
+						subByteBuffer.put(b);
+					}
+				}
+				return stringList.toArray(new String[0]);
+			case DateTimeArray:
+				ByteBuffer dateTimeByteBuffer = ByteBuffer.wrap(protoMetric.getBytesValue().toByteArray());
+				List<Date> dateTimeList = new ArrayList<>();
+				dateTimeByteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+				while (dateTimeByteBuffer.hasRemaining()) {
+					long value = dateTimeByteBuffer.getLong();
+					Date date = new Date(value);
+					dateTimeList.add(date);
+				}
+				return dateTimeList.toArray(new Date[0]);
 			case Unknown:
 			default:
 				throw new Exception("Failed to decode: Unknown MetricDataType " + metricType);
@@ -396,10 +521,17 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 			case UInt16:
 				return protoParameter.getIntValue();
 			case UInt32:
+				if (protoParameter.hasIntValue()) {
+					return Integer.toUnsignedLong(protoParameter.getIntValue());
+				} else if (protoParameter.hasLongValue()) {
+					return protoParameter.getLongValue();
+				} else {
+					logger.error("Invalid value for UInt32 datatype");
+				}
 			case Int64:
 				return protoParameter.getLongValue();
 			case UInt64:
-				return BigInteger.valueOf(protoParameter.getLongValue());
+				return new BigInteger(Long.toUnsignedString(protoParameter.getLongValue()));
 			case String:
 			case Text:
 				return protoParameter.getStringValue();
@@ -463,6 +595,13 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 					return new Value<Integer>(type, null);
 				}
 			case UInt32:
+				if (protoValue.hasIntValue()) {
+					return new Value<Long>(type, Integer.toUnsignedLong(protoValue.getIntValue()));
+				} else if (protoValue.hasLongValue()) {
+					return new Value<Long>(type, protoValue.getLongValue());
+				} else {
+					return new Value<Long>(type, null);
+				}
 			case Int64:
 				if (protoValue.hasLongValue()) {
 					return new Value<Long>(type, protoValue.getLongValue());
@@ -471,7 +610,8 @@ public class SparkplugBPayloadDecoder implements PayloadDecoder<SparkplugBPayloa
 				}
 			case UInt64:
 				if (protoValue.hasLongValue()) {
-					return new Value<BigInteger>(type, BigInteger.valueOf(protoValue.getLongValue()));
+					return new Value<BigInteger>(type,
+							new BigInteger(Long.toUnsignedString(protoValue.getLongValue())));
 				} else {
 					return new Value<BigInteger>(type, null);
 				}

@@ -1,9 +1,16 @@
-/*
- * Licensed Materials - Property of Cirrus Link Solutions
- * Copyright (c) 2022 Cirrus Link Solutions LLC - All Rights Reserved
- * Unauthorized copying of this file, via any medium is strictly prohibited
- * Proprietary and confidential
- */
+/********************************************************************************
+ * Copyright (c) 2022 Cirrus Link Solutions and others
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0.
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Cirrus Link Solutions - initial implementation
+ ********************************************************************************/
+
 package org.eclipse.tahu.message.model;
 
 import java.util.ArrayList;
@@ -11,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -18,6 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * A class representing a Sparkplug B payload as a {@link Map} to prevent duplication of {@link Metric}s. This can be
+ * useful for Sparkplug BIRTH payloads
+ */
 public class SparkplugBPayloadMap extends SparkplugBPayload {
 
 	private static Logger logger = LoggerFactory.getLogger(SparkplugBPayloadMap.class.getName());
@@ -26,11 +38,23 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 
 	private final Object mapLock = new Object();
 
+	/**
+	 * Default Constructor
+	 */
 	public SparkplugBPayloadMap() {
 		super();
 		metricMap = new ConcurrentHashMap<>();
 	}
 
+	/**
+	 * Constructor
+	 *
+	 * @param timestamp the overall {@link Date} timestamp of the {@link SparkplugBPayload}
+	 * @param metrics a {@link List} of {@link Metrics} in the {@link SparkplugBPayload}
+	 * @param seq the Sparkplug sequence number for the {@link SparkplugBPayload}
+	 * @param uuid a UUID for the {@link SparkplugBPayload}
+	 * @param body an array of bytes for the {@link SparkplugBPayload}
+	 */
 	public SparkplugBPayloadMap(Date timestamp, List<Metric> metrics, long seq, String uuid, byte[] body) {
 		super(timestamp, null, seq, uuid, body);
 		metricMap = new ConcurrentHashMap<>();
@@ -39,6 +63,12 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Adds a {@link Metric} to the {@link SparkplugBPayload}. If the {@link Metric} is already present with the same
+	 * name, it will be replaced.
+	 *
+	 * metric the {@link Metric} to add
+	 */
 	@Override
 	public void addMetric(Metric metric) {
 		synchronized (mapLock) {
@@ -46,6 +76,12 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Adds a {@link Metric} to the {@link SparkplugBPayload}. If the {@link Metric} is already present with the same
+	 * name, it will be replaced.
+	 *
+	 * index this is ignored for this implementation metric the {@link Metric} to add
+	 */
 	@Override
 	public void addMetric(int index, Metric metric) {
 		synchronized (mapLock) {
@@ -53,6 +89,13 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Adds a {@link List} of {@link Metric}s to the {@link SparkplugBPayloadMap}. If the list of {@link Metric}s has
+	 * metrics with duplicate names, only the last one in the {@link List} will be included in the
+	 * {@link SparkplugBPayloadMap}
+	 *
+	 * metrics a {@link List} of {@link Metric}s to add to the {@link SparkplugBPayloadMap}
+	 */
 	@Override
 	public void addMetrics(List<Metric> metrics) {
 		synchronized (mapLock) {
@@ -62,6 +105,11 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Not used for the {@link SparkplugBPayloadMap}. This will always do nothing and return null.
+	 *
+	 * index not used
+	 */
 	@Override
 	public Metric removeMetric(int index) {
 		// This method isn't valid for the SparkplugBPayloadMap
@@ -69,6 +117,12 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		return null;
 	}
 
+	/**
+	 * Removes a {@link Metric} by equality to a {@link Metric} in the {@link List} of metrics
+	 *
+	 * @param metric the {@link Metric} to remove
+	 * @return true if the {@link Metric} was removed, otherwise false
+	 */
 	@Override
 	public boolean removeMetric(Metric metric) {
 		synchronized (mapLock) {
@@ -80,6 +134,12 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Removes a {@link Metric} by metric name
+	 *
+	 * @param metricName the {@link String} metricName to remove
+	 * @return true if the {@link Metric} was removed, otherwise false
+	 */
 	public boolean removeMetric(String metricName) {
 		synchronized (mapLock) {
 			if (metricName != null) {
@@ -93,17 +153,28 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 		}
 	}
 
+	/**
+	 * Gets a {@link List} of {@link Metric}s in the {@link SparkplugBPayloadMap}
+	 */
 	@Override
 	public List<Metric> getMetrics() {
 		return new ArrayList<>(metricMap.values());
 	}
 
+	/**
+	 * Gets the number of {@link Metric}s in this {@link SparkplugBPayloadMap}
+	 */
 	@Override
 	@JsonIgnore
 	public Integer getMetricCount() {
 		return metricMap.size();
 	}
 
+	/**
+	 * Sets the {@link List} of {@link Metric}s for this {@link SparkplugBPayloadMap}
+	 *
+	 * @param metrics the {@link List} of {@link Metric}s to set for this {@link SparkplugBPayloadMap}
+	 */
 	@Override
 	public void setMetrics(List<Metric> metrics) {
 		metricMap.clear();
@@ -130,31 +201,91 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 	 *            in the {@link Metric}
 	 * @param metric the {@link Metric} to update the value of
 	 */
-	public void updateMetricValue(String metricName, Metric metric) {
-		if (metric == null) {
-			logger.info("Metric '{}' is null during update - removing from cache", metricName);
-			metricMap.put(metricName, null);
+	public void updateMetricValue(String newMetricName, Metric newMetric, List<Property<?>> customProperties) {
+		if (newMetric == null) {
+			logger.info("Metric '{}' is null during update - removing from cache", newMetricName);
+			metricMap.put(newMetricName, null);
 			return;
 		}
 
-		Metric existingMetric = metricMap.get(metricName);
+		Metric existingMetric = metricMap.get(newMetricName);
 
 		// Update the 'qualified value' which is the value, quality, and timestamp
 		if (existingMetric != null) {
-			existingMetric.setValue(metric.getValue());
-			PropertySet props = existingMetric.getProperties();
-			if (metric.getProperties() != null
-					&& metric.getProperties().getPropertyValue(SparkplugMeta.QUALITY_PROP_NAME) != null) {
-				props.setProperty(SparkplugMeta.QUALITY_PROP_NAME,
-						metric.getProperties().getPropertyValue(SparkplugMeta.QUALITY_PROP_NAME));
+			if (newMetric.getDataType() == MetricDataType.Template && newMetric.getValue() != null) {
+				updateTemplateMetricValues((TemplateMap) (getMetric(newMetricName).getValue()), newMetric,
+						customProperties);
+			} else {
+				existingMetric.setValue(newMetric.getValue());
 			}
-			existingMetric.setTimestamp(metric.getTimestamp());
+
+			handleProps(existingMetric, newMetric, customProperties);
+			logger.trace("Updated metric in the map: {}", existingMetric);
 		} else {
-			logger.info("Adding new metric to cache when updating: {}", metricName);
-			metricMap.put(metricName, metric);
+			logger.trace("Adding new metric to cache when updating: {}", newMetric);
+			metricMap.put(newMetricName, newMetric);
 		}
 	}
 
+	private void updateTemplateMetricValues(TemplateMap existingTemplateMap, Metric newMetric,
+			List<Property<?>> customProperties) {
+		Template newTemplate = (Template) newMetric.getValue();
+		List<Metric> newMemberMetrics = newTemplate.getMetrics();
+		if (newMemberMetrics != null && !newMemberMetrics.isEmpty()) {
+			for (Metric newMemberMetric : newMemberMetrics) {
+				Metric existingMetric = existingTemplateMap.getMetricMap().get(newMemberMetric.getName());
+				if (newMemberMetric.getDataType() == MetricDataType.Template && newMemberMetric.getValue() != null) {
+					updateTemplateMetricValues((TemplateMap) existingMetric.getValue(), newMemberMetric,
+							customProperties);
+				} else {
+					existingTemplateMap.getMetricMap().get(newMemberMetric.getName())
+							.setValue(newMemberMetric.getValue());
+				}
+
+				handleProps(existingMetric, newMemberMetric, customProperties);
+			}
+		}
+	}
+
+	private void handleProps(Metric existingMetric, Metric newMetric, List<Property<?>> customProperties) {
+		PropertySet props = existingMetric.getProperties();
+		if (newMetric.getProperties() != null
+				&& newMetric.getProperties().getPropertyValue(SparkplugMeta.QUALITY_PROP_NAME) != null) {
+			if (props == null) {
+				props = new PropertySet();
+				existingMetric.setProperties(props);
+			}
+			props.setProperty(SparkplugMeta.QUALITY_PROP_NAME,
+					newMetric.getProperties().getPropertyValue(SparkplugMeta.QUALITY_PROP_NAME));
+		} else {
+			if (props != null) {
+				// If there is no quality - it is implied good and should be updated as such by simply removing it
+				props.remove(SparkplugMeta.QUALITY_PROP_NAME);
+			}
+		}
+		existingMetric.setTimestamp(newMetric.getTimestamp());
+
+		if (customProperties != null && !customProperties.isEmpty()) {
+			for (Property<?> customProperty : customProperties) {
+				if (newMetric.getProperties() != null
+						&& newMetric.getProperties().getPropertyValue(customProperty.getName()) != null) {
+					if (props == null) {
+						props = new PropertySet();
+						existingMetric.setProperties(props);
+					}
+					props.setProperty(customProperty.getName(),
+							newMetric.getProperties().getPropertyValue(customProperty.getName()));
+				}
+			}
+		}
+	}
+
+	/**
+	 * Updates all {@link Metric} timestamps to the specified {@link Date} as well as the timestamp for the overall
+	 * {@link SparkplugBPayloadMap}
+	 *
+	 * @param date the {@link Date} timestamp to use for all {@link Metric}s in this {@link SparkplugBPayloadMap}
+	 */
 	public void updateMetricTimestamps(Date date) {
 		for (Metric metric : metricMap.values()) {
 			metric.setTimestamp(date);
@@ -178,8 +309,8 @@ public class SparkplugBPayloadMap extends SparkplugBPayload {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("SparkplugBPayload [timestamp=");
-		builder.append(super.getTimestamp());
+		builder.append("SparkplugBPayloadMap [timestamp=");
+		builder.append(super.getTimestamp() != null ? super.getTimestamp().getTime() : "null");
 		builder.append(", metrics=");
 		builder.append(getMetrics());
 		builder.append(", seq=");

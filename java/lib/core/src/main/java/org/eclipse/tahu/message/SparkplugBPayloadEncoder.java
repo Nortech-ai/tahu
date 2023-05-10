@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2014-2020 Cirrus Link Solutions and others
+ * Copyright (c) 2014-2023 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -17,6 +17,8 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -48,11 +50,15 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 
 	private static final Logger logger = LoggerFactory.getLogger(SparkplugBPayloadEncoder.class.getName());
 
+	/**
+	 * Default Constructor
+	 */
 	public SparkplugBPayloadEncoder() {
 		super();
 	}
 
-	public byte[] getBytes(SparkplugBPayload payload) throws IOException {
+	@Override
+	public byte[] getBytes(SparkplugBPayload payload, boolean stripDataTypes) throws IOException {
 
 		SparkplugBProto.Payload.Builder protoMsg = SparkplugBProto.Payload.newBuilder();
 
@@ -73,10 +79,14 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 
 		// Set the metrics
 		for (Metric metric : payload.getMetrics()) {
+			if (metric == null) {
+				logger.warn("Not adding NULL metric");
+				continue;
+			}
 			try {
-				protoMsg.addMetrics(convertMetric(metric));
+				protoMsg.addMetrics(convertMetric(metric, stripDataTypes));
 			} catch (Exception e) {
-				logger.error("Failed to add metric: " + metric.getName());
+				logger.error("Failed to add metric: {}", metric.getName(), e);
 				throw new RuntimeException(e);
 			}
 		}
@@ -89,14 +99,17 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 		return protoMsg.build().toByteArray();
 	}
 
-	private SparkplugBProto.Payload.Metric.Builder convertMetric(Metric metric) throws Exception {
+	private SparkplugBProto.Payload.Metric.Builder convertMetric(Metric metric, boolean stripDataTypes)
+			throws Exception {
 
 		// build a metric
 		SparkplugBProto.Payload.Metric.Builder builder = SparkplugBProto.Payload.Metric.newBuilder();
 
 		// set the basic parameters
-		builder.setDatatype(metric.getDataType().toIntValue());
-		builder = setMetricValue(builder, metric);
+		if (!stripDataTypes) {
+			builder.setDatatype(metric.getDataType().toIntValue());
+		}
+		builder = setMetricValue(builder, metric, stripDataTypes);
 
 		// Set the name, data type, and value
 		if (metric.hasName()) {
@@ -151,8 +164,8 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 				SparkplugBProto.Payload.Template.Parameter.newBuilder();
 
 		if (logger.isTraceEnabled()) {
-			logger.trace("Adding parameter: " + parameter.getName());
-			logger.trace("            type: " + parameter.getType());
+			logger.trace("Adding parameter: {}", parameter.getName());
+			logger.trace("            type: {}", parameter.getType());
 		}
 
 		// Set the name
@@ -193,19 +206,25 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 						builder.setIntValue((Byte) value.getValue());
 						break;
 					case Int16:
-					case UInt8:
 						builder.setIntValue((Short) value.getValue());
 						break;
 					case Int32:
-					case UInt16:
 						builder.setIntValue((Integer) value.getValue());
 						break;
 					case Int64:
-					case UInt32:
 						builder.setLongValue((Long) value.getValue());
 						break;
+					case UInt8:
+						builder.setIntValue(Short.toUnsignedInt((Short) value.getValue()));
+						break;
+					case UInt16:
+						builder.setIntValue((int) Integer.toUnsignedLong((Integer) value.getValue()));
+						break;
+					case UInt32:
+						builder.setLongValue(Long.parseUnsignedLong(Long.toUnsignedString((Long) value.getValue())));
+						break;
 					case UInt64:
-						builder.setLongValue(((BigInteger) value.getValue()).longValue());
+						builder.setLongValue(bigIntegerToUnsignedLong((BigInteger) value.getValue()));
 						break;
 					case String:
 					case Text:
@@ -225,7 +244,7 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 						break;
 					case Unknown:
 					default:
-						logger.error("Unknown PropertyDataType: " + value.getType());
+						logger.error("Unknown PropertyDataType: {}", value.getType());
 						throw new Exception("Failed to convert value " + value.getType());
 				}
 			}
@@ -260,19 +279,25 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					builder.setIntValue((Byte) value);
 					break;
 				case Int16:
-				case UInt8:
 					builder.setIntValue((Short) value);
 					break;
 				case Int32:
-				case UInt16:
 					builder.setIntValue((Integer) value);
 					break;
 				case Int64:
-				case UInt32:
 					builder.setLongValue((Long) value);
 					break;
+				case UInt8:
+					builder.setIntValue(Short.toUnsignedInt((Short) value));
+					break;
+				case UInt16:
+					builder.setIntValue((int) Integer.toUnsignedLong((Integer) value));
+					break;
+				case UInt32:
+					builder.setLongValue(Long.valueOf(Long.toUnsignedString(((BigInteger) value).longValue())));
+					break;
 				case UInt64:
-					builder.setLongValue(((BigInteger) value).longValue());
+					builder.setLongValue(bigIntegerToUnsignedLong((BigInteger) value));
 					break;
 				case Text:
 				case String:
@@ -280,7 +305,7 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					break;
 				case Unknown:
 				default:
-					logger.error("Unknown Type: " + type);
+					logger.error("Unknown Type: {}", type);
 					throw new Exception("Failed to encode");
 
 			}
@@ -289,10 +314,12 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 	}
 
 	private SparkplugBProto.Payload.Metric.Builder setMetricValue(SparkplugBProto.Payload.Metric.Builder metricBuilder,
-			Metric metric) throws Exception {
+			Metric metric, boolean stripDataTypes) throws Exception {
 
 		// Set the data type
-		metricBuilder.setDatatype(metric.getDataType().toIntValue());
+		if (!stripDataTypes) {
+			metricBuilder.setDatatype(metric.getDataType().toIntValue());
+		}
 
 		if (metric.getValue() == null) {
 			metricBuilder.setIsNull(true);
@@ -318,22 +345,28 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					metricBuilder.setDoubleValue((Double) metric.getValue());
 					break;
 				case Int8:
-					metricBuilder.setIntValue(((Byte) metric.getValue()).intValue());
+					metricBuilder.setIntValue((Byte) metric.getValue());
 					break;
 				case Int16:
-				case UInt8:
-					metricBuilder.setIntValue(((Short) metric.getValue()).intValue());
+					metricBuilder.setIntValue((Short) metric.getValue());
 					break;
 				case Int32:
-				case UInt16:
-					metricBuilder.setIntValue((int) metric.getValue());
+					metricBuilder.setIntValue((Integer) metric.getValue());
 					break;
-				case UInt32:
 				case Int64:
 					metricBuilder.setLongValue((Long) metric.getValue());
 					break;
+				case UInt8:
+					metricBuilder.setIntValue(Short.toUnsignedInt((Short) metric.getValue()));
+					break;
+				case UInt16:
+					metricBuilder.setIntValue((int) Integer.toUnsignedLong((Integer) metric.getValue()));
+					break;
+				case UInt32:
+					metricBuilder.setLongValue(Long.parseUnsignedLong(Long.toUnsignedString((Long) metric.getValue())));
+					break;
 				case UInt64:
-					metricBuilder.setLongValue(((BigInteger) metric.getValue()).longValue());
+					metricBuilder.setLongValue(bigIntegerToUnsignedLong((BigInteger) metric.getValue()));
 					break;
 				case String:
 				case Text:
@@ -410,7 +443,7 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					// Set the template metrics
 					if (template.getMetrics() != null) {
 						for (Metric templateMetric : template.getMetrics()) {
-							templateBuilder.addMetrics(convertMetric(templateMetric));
+							templateBuilder.addMetrics(convertMetric(templateMetric, stripDataTypes));
 						}
 					}
 
@@ -428,8 +461,19 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					Byte[] int8ArrayValue = (Byte[]) metric.getValue();
 					ByteBuffer int8ByteBuffer =
 							ByteBuffer.allocate(int8ArrayValue.length).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullInt8ArrayElements = false;
 					for (Byte value : int8ArrayValue) {
-						int8ByteBuffer.put(value);
+						if (value != null) {
+							int8ByteBuffer.put(value);
+						} else {
+							hasNullInt8ArrayElements = true;
+							int8ByteBuffer.put((byte) 0);
+						}
+					}
+					if (hasNullInt8ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} Int8Array. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (int8ByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(int8ByteBuffer.array()));
@@ -439,8 +483,19 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					Short[] int16ArrayValue = (Short[]) metric.getValue();
 					ByteBuffer int16ByteBuffer =
 							ByteBuffer.allocate(int16ArrayValue.length * 2).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullInt16ArrayElements = false;
 					for (Short value : int16ArrayValue) {
-						int16ByteBuffer.putShort(value);
+						if (value != null) {
+							int16ByteBuffer.putShort(value);
+						} else {
+							hasNullInt16ArrayElements = true;
+							int16ByteBuffer.putShort((short) 0);
+						}
+					}
+					if (hasNullInt16ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} Int16Array. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (int16ByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(int16ByteBuffer.array()));
@@ -450,8 +505,19 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					Integer[] int32ArrayValue = (Integer[]) metric.getValue();
 					ByteBuffer int32ByteBuffer =
 							ByteBuffer.allocate(int32ArrayValue.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullInt32ArrayElements = false;
 					for (Integer value : int32ArrayValue) {
-						int32ByteBuffer.putInt(value);
+						if (value != null) {
+							int32ByteBuffer.putInt(value);
+						} else {
+							hasNullInt32ArrayElements = true;
+							int32ByteBuffer.putInt(0);
+						}
+					}
+					if (hasNullInt32ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} Int32Array. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (int32ByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(int32ByteBuffer.array()));
@@ -461,19 +527,129 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					Long[] int64ArrayValue = (Long[]) metric.getValue();
 					ByteBuffer int64ByteBuffer =
 							ByteBuffer.allocate(int64ArrayValue.length * 8).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullInt64ArrayElements = false;
 					for (Long value : int64ArrayValue) {
-						int64ByteBuffer.putLong(value);
+						if (value != null) {
+							int64ByteBuffer.putLong(value);
+						} else {
+							hasNullInt64ArrayElements = true;
+							int64ByteBuffer.putLong(0L);
+						}
+					}
+					if (hasNullInt64ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} Int64Array. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (int64ByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(int64ByteBuffer.array()));
+					}
+					break;
+				case UInt8Array:
+					Short[] uInt8ArrayValue = (Short[]) metric.getValue();
+					ByteBuffer uInt8ByteBuffer =
+							ByteBuffer.allocate(uInt8ArrayValue.length).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullUnt8ArrayElements = false;
+					for (Short value : uInt8ArrayValue) {
+						if (value != null) {
+							uInt8ByteBuffer.put((byte) (value & 0xffff));
+						} else {
+							hasNullUnt8ArrayElements = true;
+							uInt8ByteBuffer.put((byte) 0);
+						}
+					}
+					if (hasNullUnt8ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} UInt8Array. All such elements will be set to 0.",
+								metric.getName());
+					}
+					if (uInt8ByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(uInt8ByteBuffer.array()));
+					}
+					break;
+				case UInt16Array:
+					Integer[] uInt16ArrayValue = (Integer[]) metric.getValue();
+					ByteBuffer uInt16ByteBuffer =
+							ByteBuffer.allocate(uInt16ArrayValue.length * 2).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullUnt16ArrayElements = false;
+					for (Integer value : uInt16ArrayValue) {
+						if (value != null) {
+							uInt16ByteBuffer.putShort((short) (value & 0xffffffff));
+						} else {
+							hasNullUnt16ArrayElements = true;
+							uInt16ByteBuffer.putShort((short) 0);
+						}
+					}
+					if (hasNullUnt16ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} UInt16Array. All such elements will be set to 0.",
+								metric.getName());
+					}
+					if (uInt16ByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(uInt16ByteBuffer.array()));
+					}
+					break;
+				case UInt32Array:
+					Long[] uInt32ArrayValue = (Long[]) metric.getValue();
+					ByteBuffer uInt32ByteBuffer =
+							ByteBuffer.allocate(uInt32ArrayValue.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullUnt32ArrayElements = false;
+					for (Long value : uInt32ArrayValue) {
+						if (value != null) {
+							uInt32ByteBuffer.putInt((int) (value & 0xffffffffffffffffL));
+						} else {
+							hasNullUnt32ArrayElements = true;
+							uInt32ByteBuffer.putInt(0);
+						}
+					}
+					if (hasNullUnt32ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} UInt32Array. All such elements will be set to 0.",
+								metric.getName());
+					}
+					if (uInt32ByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(uInt32ByteBuffer.array()));
+					}
+					break;
+				case UInt64Array:
+					BigInteger[] uInt64ArrayValue = (BigInteger[]) metric.getValue();
+					ByteBuffer uInt64ByteBuffer =
+							ByteBuffer.allocate(uInt64ArrayValue.length * 8).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullUnt64ArrayElements = false;
+					for (BigInteger value : uInt64ArrayValue) {
+						if (value != null) {
+							uInt64ByteBuffer.putLong(bigIntegerToUnsignedLong(value));
+						} else {
+							hasNullUnt64ArrayElements = true;
+							uInt64ByteBuffer.putLong(0L);
+						}
+					}
+					if (hasNullUnt64ArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} UInt64Array. All such elements will be set to 0.",
+								metric.getName());
+					}
+					if (uInt64ByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(uInt64ByteBuffer.array()));
 					}
 					break;
 				case FloatArray:
 					Float[] floatArrayValue = (Float[]) metric.getValue();
 					ByteBuffer floatByteBuffer =
 							ByteBuffer.allocate(floatArrayValue.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullFloatArrayElements = false;
 					for (Float value : floatArrayValue) {
-						floatByteBuffer.putFloat(value);
+						if (value != null) {
+							floatByteBuffer.putFloat(value);
+						} else {
+							hasNullFloatArrayElements = true;
+							floatByteBuffer.putFloat(0);
+						}
+					}
+					if (hasNullFloatArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} FloatArray. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (floatByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(floatByteBuffer.array()));
@@ -483,8 +659,19 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					Double[] doubleArrayValue = (Double[]) metric.getValue();
 					ByteBuffer doubleByteBuffer =
 							ByteBuffer.allocate(doubleArrayValue.length * 8).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullDoubleArrayElements = false;
 					for (Double value : doubleArrayValue) {
-						doubleByteBuffer.putDouble(value);
+						if (value != null) {
+							doubleByteBuffer.putDouble(value);
+						} else {
+							hasNullDoubleArrayElements = true;
+							doubleByteBuffer.putDouble(0);
+						}
+					}
+					if (hasNullDoubleArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} DoubleArray. All such elements will be set to 0.",
+								metric.getName());
 					}
 					if (doubleByteBuffer.hasArray()) {
 						metricBuilder.setBytesValue(ByteString.copyFrom(doubleByteBuffer.array()));
@@ -500,21 +687,87 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 					booleanByteBuffer.putInt(booleanArrayValue.length);
 
 					// Get the remaining bytes
+					boolean hasNullBooleanArrayElements = false;
 					for (int i = 0; i < numberOfBytes; i++) {
 						byte nextByte = 0;
 						for (int bit = 0; bit < 8; bit++) {
 							int index = i * 8 + bit;
-							if (index < booleanArrayValue.length && booleanArrayValue[index]) {
-								nextByte |= (128 >> bit);
+							if (index < booleanArrayValue.length) {
+								Boolean value = booleanArrayValue[index];
+								if (value == null) {
+									hasNullBooleanArrayElements = true;
+									value = Boolean.valueOf(false);
+								}
+								if (value.booleanValue()) {
+									nextByte |= (128 >> bit);
+								}
 							}
 						}
 						booleanByteBuffer.put(nextByte);
 					}
+					if (hasNullBooleanArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} BooleanArray. All such elements will be set to 'false'.",
+								metric.getName());
+					}
 					metricBuilder.setBytesValue(ByteString.copyFrom(booleanByteBuffer.array()));
+					break;
+				case StringArray:
+					String[] stringArrayValue = (String[]) metric.getValue();
+
+					int size = 0;
+					List<byte[]> bytesArrays = new ArrayList<>();
+					boolean hasNullStringArrayElements = false;
+					for (String string : stringArrayValue) {
+						byte[] stringBytes = null;
+						if (string != null) {
+							stringBytes = string.getBytes(StandardCharsets.UTF_8);
+						} else {
+							hasNullStringArrayElements = true;
+							stringBytes = new byte[0];
+						}
+						size = size + stringBytes.length + 1;
+						bytesArrays.add(stringBytes);
+					}
+					if (hasNullStringArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} StringArray. All such elements will be set to an empty string.",
+								metric.getName());
+					}
+					ByteBuffer stringByteBuffer = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN);
+					for (byte[] bytesArray : bytesArrays) {
+						stringByteBuffer.put(bytesArray);
+						stringByteBuffer.put((byte) 0);
+					}
+					if (stringByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(stringByteBuffer.array()));
+					}
+					break;
+				case DateTimeArray:
+					Date[] dateTimeArrayValue = (Date[]) metric.getValue();
+					ByteBuffer dateTimeByteBuffer =
+							ByteBuffer.allocate(dateTimeArrayValue.length * 8).order(ByteOrder.LITTLE_ENDIAN);
+					boolean hasNullDateTimeArrayElements = false;
+					for (Date value : dateTimeArrayValue) {
+						if (value != null) {
+							dateTimeByteBuffer.putLong(value.getTime());
+						} else {
+							hasNullDateTimeArrayElements = true;
+							dateTimeByteBuffer.putLong(new Date(0L).getTime());
+						}
+					}
+					if (hasNullDateTimeArrayElements) {
+						logger.warn(
+								"SparkplugB doesn't support 'null' elements in the {} DateTimeArray. All such elements will be set to start of epoch.",
+								metric.getName());
+					}
+					if (dateTimeByteBuffer.hasArray()) {
+						metricBuilder.setBytesValue(ByteString.copyFrom(dateTimeByteBuffer.array()));
+					}
 					break;
 				case Unknown:
 				default:
-					logger.error("Unsupported MetricDataType: " + metric.getDataType());
+					logger.error("Unsupported MetricDataType: {}", metric.getDataType());
 					throw new Exception("Failed to encode");
 
 			}
@@ -574,31 +827,46 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 				protoValueBuilder.setIntValue((Byte) value.getValue());
 				break;
 			case Int16:
-			case UInt8:
 				if (value == null || value.getValue() == null) {
 					return protoValueBuilder;
 				}
 				protoValueBuilder.setIntValue((Short) value.getValue());
 				break;
 			case Int32:
-			case UInt16:
 				if (value == null || value.getValue() == null) {
 					return protoValueBuilder;
 				}
 				protoValueBuilder.setIntValue((Integer) value.getValue());
 				break;
 			case Int64:
-			case UInt32:
 				if (value == null || value.getValue() == null) {
 					return protoValueBuilder;
 				}
 				protoValueBuilder.setLongValue((Long) value.getValue());
 				break;
+			case UInt8:
+				if (value == null || value.getValue() == null) {
+					return protoValueBuilder;
+				}
+				protoValueBuilder.setIntValue(Short.toUnsignedInt((Short) value.getValue()));
+				break;
+			case UInt16:
+				if (value == null || value.getValue() == null) {
+					return protoValueBuilder;
+				}
+				protoValueBuilder.setIntValue((int) Integer.toUnsignedLong((Integer) value.getValue()));
+				break;
+			case UInt32:
+				if (value == null || value.getValue() == null) {
+					return protoValueBuilder;
+				}
+				protoValueBuilder.setLongValue(Long.parseUnsignedLong(Long.toUnsignedString((Long) value.getValue())));
+				break;
 			case UInt64:
 				if (value == null || value.getValue() == null) {
 					return protoValueBuilder;
 				}
-				protoValueBuilder.setLongValue(((BigInteger) value.getValue()).longValue());
+				protoValueBuilder.setLongValue(bigIntegerToUnsignedLong((BigInteger) value.getValue()));
 				break;
 			case Float:
 				if (value == null || value.getValue() == null) {
@@ -659,5 +927,14 @@ public class SparkplugBPayloadEncoder implements PayloadEncoder<SparkplugBPayloa
 			return Boolean.parseBoolean(value.toString());
 		}
 		return (Boolean) value;
+	}
+
+	private long bigIntegerToUnsignedLong(BigInteger bigInteger) {
+		BigInteger bref = BigInteger.ONE.shiftLeft(64);
+		if (bigInteger.compareTo(BigInteger.ZERO) < 0)
+			bigInteger = bigInteger.add(bref);
+		if (bigInteger.compareTo(bref) >= 0 || bigInteger.compareTo(BigInteger.ZERO) < 0)
+			throw new RuntimeException("Out of range: " + bigInteger);
+		return bigInteger.longValue();
 	}
 }

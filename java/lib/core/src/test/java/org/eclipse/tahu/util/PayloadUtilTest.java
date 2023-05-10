@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2016, 2018 Cirrus Link Solutions and others
+ * Copyright (c) 2016-2022 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -24,13 +24,8 @@ import org.eclipse.tahu.message.model.Metric.MetricBuilder;
 import org.eclipse.tahu.message.model.MetricDataType;
 import org.eclipse.tahu.message.model.SparkplugBPayload;
 import org.eclipse.tahu.message.model.SparkplugBPayload.SparkplugBPayloadBuilder;
-import org.slf4j.LoggerFactory;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 
 /**
  * Unit tests for PayloadUtil.
@@ -41,12 +36,6 @@ public class PayloadUtilTest {
 
 	public PayloadUtilTest() {
 		this.testTime = new Date();
-	}
-
-	@BeforeClass
-	public void beforeClass() {
-		Logger rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-		rootLogger.setLevel(Level.ALL);
 	}
 
 	@DataProvider
@@ -71,7 +60,7 @@ public class PayloadUtilTest {
 	public void testCompression(CompressionAlgorithm algorithm, SparkplugBPayload payload) throws Exception {
 
 		// Compress the payload
-		SparkplugBPayload compressedPayload = PayloadUtil.compress(payload, algorithm);
+		SparkplugBPayload compressedPayload = PayloadUtil.compress(payload, algorithm, false);
 
 		// Test that there is a body (the compressed bytes)
 		assertThat(compressedPayload.getBody() != null).isTrue();
@@ -83,7 +72,7 @@ public class PayloadUtilTest {
 		assertThat(compressedPayload.getUuid()).isEqualTo(PayloadUtil.UUID_COMPRESSED);
 
 		// Decompress the payload
-		SparkplugBPayload decompressedPayload = PayloadUtil.decompress(compressedPayload);
+		SparkplugBPayload decompressedPayload = PayloadUtil.decompress(compressedPayload, null);
 
 		// Test that the decompressed payload matches the original
 		assertThat(decompressedPayload.getTimestamp()).isEqualTo(payload.getTimestamp());

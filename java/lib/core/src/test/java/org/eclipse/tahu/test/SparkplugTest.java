@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2016, 2018 Cirrus Link Solutions and others
+ * Copyright (c) 2016-2022 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -53,13 +53,8 @@ import org.eclipse.tahu.message.model.Template;
 import org.eclipse.tahu.message.model.Template.TemplateBuilder;
 import org.eclipse.tahu.message.model.Value;
 import org.eclipse.tahu.util.PayloadUtil;
-import org.slf4j.LoggerFactory;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 
 /**
  * Sparkplug Test class for encoding and decoding sparkplug payloads
@@ -73,12 +68,6 @@ public class SparkplugTest {
 
 	public SparkplugTest() {
 		validator = JsonValidator.getInstance();
-	}
-
-	@BeforeClass
-	public void beforeClass() {
-		Logger rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-		rootLogger.setLevel(Level.ALL);
 	}
 
 	@DataProvider
@@ -249,7 +238,7 @@ public class SparkplugTest {
 		SparkplugBPayloadEncoder encoder = new SparkplugBPayloadEncoder();
 		byte[] bytes = null;
 		try {
-			bytes = encoder.getBytes(payloadBuilder.createPayload());
+			bytes = encoder.getBytes(payloadBuilder.createPayload(), false);
 		} catch (IOException e) {
 			e.printStackTrace();
 			fail(e.getMessage());
@@ -259,7 +248,7 @@ public class SparkplugTest {
 		PayloadDecoder<SparkplugBPayload> decoder = new SparkplugBPayloadDecoder();
 		SparkplugBPayload decodedPayload = null;
 		try {
-			decodedPayload = decoder.buildFromByteArray(bytes);
+			decodedPayload = decoder.buildFromByteArray(bytes, null);
 		} catch (Exception e) {
 			e.printStackTrace();
 			fail(e.getMessage());
@@ -322,11 +311,11 @@ public class SparkplugTest {
 	public void testValidMetricPayload(Metric metric, long alias, Date timestamp, boolean isHistorical,
 			boolean isTransient, boolean isNull) throws Exception {
 		// Encode
-		byte[] bytes = new SparkplugBPayloadEncoder()
-				.getBytes(new SparkplugBPayloadBuilder().setTimestamp(new Date()).addMetric(metric).createPayload());
+		byte[] bytes = new SparkplugBPayloadEncoder().getBytes(
+				new SparkplugBPayloadBuilder().setTimestamp(new Date()).addMetric(metric).createPayload(), false);
 
 		// Decode and test
-		SparkplugBPayload payload = new SparkplugBPayloadDecoder().buildFromByteArray(bytes);
+		SparkplugBPayload payload = new SparkplugBPayloadDecoder().buildFromByteArray(bytes, null);
 		Metric decodedMetric = payload.getMetrics().get(0);
 		assertThat(decodedMetric.getAlias()).isEqualTo(alias);
 		assertThat(decodedMetric.getTimestamp()).isEqualTo(timestamp);
@@ -356,11 +345,12 @@ public class SparkplugTest {
 
 			// Encode
 			byte[] bytes = encoder.getBytes(new SparkplugBPayloadBuilder().setTimestamp(currentTime)
-					.addMetric(new MetricBuilder(name, type, value).metaData(metaData).createMetric()).createPayload());
+					.addMetric(new MetricBuilder(name, type, value).metaData(metaData).createMetric()).createPayload(),
+					false);
 
 			// Decode
 			PayloadDecoder<SparkplugBPayload> decoder = new SparkplugBPayloadDecoder();
-			SparkplugBPayload decodedPayload = decoder.buildFromByteArray(bytes);
+			SparkplugBPayload decodedPayload = decoder.buildFromByteArray(bytes, null);
 
 			for (Metric metric : decodedPayload.getMetrics()) {
 				if (metric.getDataType().equals(MetricDataType.Template)) {

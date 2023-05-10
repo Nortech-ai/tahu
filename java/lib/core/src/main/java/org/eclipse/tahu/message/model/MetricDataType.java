@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2014, 2018 Cirrus Link Solutions and others
+ * Copyright (c) 2014-2022 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -48,10 +48,7 @@ public enum MetricDataType {
 	File(18, File.class),
 	Template(19, Template.class),
 
-	// TODO - to be added
-	// Additional PropertyValue Types
-	// PropertySet = 20;
-	// PropertySetList = 21;
+	// PropertyValue Types (20 and 21) are NOT metric datatypes
 
 	// Array Types
 	Int8Array(22, Byte[].class),
@@ -65,8 +62,8 @@ public enum MetricDataType {
 	FloatArray(30, Float[].class),
 	DoubleArray(31, Double[].class),
 	BooleanArray(32, Boolean[].class),
-	StringArray(33, Byte[].class),
-	DateTimeArray(34, Long[].class),
+	StringArray(33, String[].class),
+	DateTimeArray(34, Date[].class),
 
 	// Unknown
 	Unknown(0, Object.class);
@@ -76,11 +73,25 @@ public enum MetricDataType {
 	private Class<?> clazz = null;
 	private int intValue = 0;
 
+	/**
+	 * Constructor
+	 *
+	 * @param intValue the integer value of this {@link MetricDataType}
+	 *
+	 * @param clazz the {@link Class} type associated with this {@link MetricDataType}
+	 */
 	private MetricDataType(int intValue, Class<?> clazz) {
 		this.intValue = intValue;
 		this.clazz = clazz;
 	}
 
+	/**
+	 * Checks the type of a specified value against the specified {@link MetricDataType}
+	 *
+	 * @param value the {@link Object} value to check against the {@link MetricDataType}
+	 *
+	 * @throws SparkplugInvalidTypeException if the value is not a valid type for the given {@link MetricDataType}
+	 */
 	public void checkType(Object value) throws SparkplugInvalidTypeException {
 		if (value != null && !clazz.isAssignableFrom(value.getClass())) {
 			logger.warn(

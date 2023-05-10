@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (c) 2014, 2018 Cirrus Link Solutions and others
+ * Copyright (c) 2014-2022 Cirrus Link Solutions and others
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License 2.0 which is available at
@@ -209,7 +209,7 @@ public class SparkplugRaspberryPiExample implements MqttCallbackExtended {
 			//
 			SparkplugBPayload payload = new SparkplugBPayloadBuilder(getNextSeqNum()).setTimestamp(new Date())
 					.addMetric(new MetricBuilder("bdSeq", MetricDataType.Int64, bdSeq).createMetric()).createPayload();
-			byte[] bytes = new SparkplugBPayloadEncoder().getBytes(payload);
+			byte[] bytes = new SparkplugBPayloadEncoder().getBytes(payload, false);
 			//
 			// Setup the Death Certificate Topic/Payload into the MQTT session
 			// parameters
@@ -431,7 +431,8 @@ public class SparkplugRaspberryPiExample implements MqttCallbackExtended {
 		if (splitTopic[0].equals(NAMESPACE) && splitTopic[1].equals(groupId) && splitTopic[2].equals("NCMD")
 				&& splitTopic[3].equals(edgeNode)) {
 
-			SparkplugBPayload inboundPayload = new SparkplugBPayloadDecoder().buildFromByteArray(message.getPayload());
+			SparkplugBPayload inboundPayload =
+					new SparkplugBPayloadDecoder().buildFromByteArray(message.getPayload(), null);
 
 			for (Metric metric : inboundPayload.getMetrics()) {
 				System.out.println("Metric: " + metric.getName() + " :: " + metric.getValue());
@@ -466,7 +467,7 @@ public class SparkplugRaspberryPiExample implements MqttCallbackExtended {
 
 				// Get the incoming metric key and value
 				SparkplugBPayload inboundPayload =
-						new SparkplugBPayloadDecoder().buildFromByteArray(message.getPayload());
+						new SparkplugBPayloadDecoder().buildFromByteArray(message.getPayload(), null);
 
 				for (Metric metric : inboundPayload.getMetrics()) {
 					System.out.println("Metric: " + metric.getName() + " :: " + metric.getValue());
@@ -554,7 +555,7 @@ public class SparkplugRaspberryPiExample implements MqttCallbackExtended {
 
 		public void run() {
 			try {
-				byte[] bytes = new SparkplugBPayloadEncoder().getBytes(payload);
+				byte[] bytes = new SparkplugBPayloadEncoder().getBytes(payload, false);
 				client.publish(topic, bytes, 0, false);
 			} catch (MqttPersistenceException e) {
 				e.printStackTrace();

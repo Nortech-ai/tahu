@@ -13,6 +13,7 @@
 import sparkplug_b_pb2
 import time
 from sparkplug_b_pb2 import Payload
+from array_packer import *
 
 seqNum = 0
 bdSeq = 0
@@ -108,7 +109,7 @@ def getNodeBirthPayload():
     payload = sparkplug_b_pb2.Payload()
     payload.timestamp = int(round(time.time() * 1000))
     payload.seq = getSeqNum()
-    addMetric(payload, "bdSeq", None, MetricDataType.Int64, --bdSeq)
+    addMetric(payload, "bdSeq", None, MetricDataType.Int64, bdSeq - 1)
     return payload
 ######################################################################
 
@@ -172,29 +173,45 @@ def initTemplateMetric(payload, name, alias, templateRef):
 
 ######################################################################
 # Helper method for adding metrics to a container which can be a
+# payload or a template with a timestamp
+######################################################################
+#def addMetric(container, name, alias, type, value):
+#    metric.timestamp = int(round(time.time() * 1000))
+#    return addMetric(container, name, alias, type, value, timestamp)
+
+######################################################################
+# Helper method for adding metrics to a container which can be a
 # payload or a template
 ######################################################################
-def addMetric(container, name, alias, type, value):
+def addMetric(container, name, alias, type, value, timestamp=int(round(time.time() * 1000))):
     metric = container.metrics.add()
     if name is not None:
         metric.name = name
     if alias is not None:
         metric.alias = alias
-    metric.timestamp = int(round(time.time() * 1000))
+    metric.timestamp = timestamp
 
     # print( "Type: " + str(type))
 
     if type == MetricDataType.Int8:
         metric.datatype = MetricDataType.Int8
+        if value < 0:
+            value = value + 2**8
         metric.int_value = value
     elif type == MetricDataType.Int16:
         metric.datatype = MetricDataType.Int16
+        if value < 0:
+            value = value + 2**16
         metric.int_value = value
     elif type == MetricDataType.Int32:
         metric.datatype = MetricDataType.Int32
+        if value < 0:
+            value = value + 2**32
         metric.int_value = value
     elif type == MetricDataType.Int64:
         metric.datatype = MetricDataType.Int64
+        if value < 0:
+            value = value + 2**64
         metric.long_value = value
     elif type == MetricDataType.UInt8:
         metric.datatype = MetricDataType.UInt8
@@ -238,6 +255,45 @@ def addMetric(container, name, alias, type, value):
     elif type == MetricDataType.Template:
         metric.datatype = MetricDataType.Template
         metric.template_value = value
+    elif type == MetricDataType.Int8Array:
+        metric.datatype = MetricDataType.Int8Array
+        metric.bytes_value = convert_to_packed_int8_array(value)
+    elif type == MetricDataType.Int16Array:
+        metric.datatype = MetricDataType.Int16Array
+        metric.bytes_value = convert_to_packed_int16_array(value)
+    elif type == MetricDataType.Int32Array:
+        metric.datatype = MetricDataType.Int32Array
+        metric.bytes_value = convert_to_packed_int32_array(value)
+    elif type == MetricDataType.Int64Array:
+        metric.datatype = MetricDataType.Int64Array
+        metric.bytes_value = convert_to_packed_int64_array(value)
+    elif type == MetricDataType.UInt8Array:
+        metric.datatype = MetricDataType.UInt8Array
+        metric.bytes_value = convert_to_packed_uint8_array(value)
+    elif type == MetricDataType.UInt16Array:
+        metric.datatype = MetricDataType.UInt16Array
+        metric.bytes_value = convert_to_packed_uint16_array(value)
+    elif type == MetricDataType.UInt32Array:
+        metric.datatype = MetricDataType.UInt32Array
+        metric.bytes_value = convert_to_packed_uint32_array(value)
+    elif type == MetricDataType.UInt64Array:
+        metric.datatype = MetricDataType.UInt64Array
+        metric.bytes_value = convert_to_packed_uint64_array(value)
+    elif type == MetricDataType.FloatArray:
+        metric.datatype = MetricDataType.FloatArray
+        metric.bytes_value = convert_to_packed_float_array(value)
+    elif type == MetricDataType.DoubleArray:
+        metric.datatype = MetricDataType.DoubleArray
+        metric.bytes_value = convert_to_packed_double_array(value)
+    elif type == MetricDataType.BooleanArray:
+        metric.datatype = MetricDataType.BooleanArray
+        metric.bytes_value = convert_to_packed_boolean_array(value)
+    elif type == MetricDataType.StringArray:
+        metric.datatype = MetricDataType.StringArray
+        metric.bytes_value = convert_to_packed_string_array(value)
+    elif type == MetricDataType.DateTimeArray:
+        metric.datatype = MetricDataType.DateTimeArray
+        metric.bytes_value = convert_to_packed_datetime_array(value)
     else:
         print( "Invalid: " + str(type))
 
@@ -308,6 +364,32 @@ def addNullMetric(container, name, alias, type):
         metric.datatype = MetricDataType.File
     elif type == MetricDataType.Template:
         metric.datatype = MetricDataType.Template
+    elif type == MetricDataType.Int8Array:
+        metric.datatype = MetricDataType.Int8Array
+    elif type == MetricDataType.Int16Array:
+        metric.datatype = MetricDataType.Int16Array
+    elif type == MetricDataType.Int32Array:
+        metric.datatype = MetricDataType.Int32Array
+    elif type == MetricDataType.Int64Array:
+        metric.datatype = MetricDataType.Int64Array
+    elif type == MetricDataType.UInt8Array:
+        metric.datatype = MetricDataType.UInt8Array
+    elif type == MetricDataType.UInt16Array:
+        metric.datatype = MetricDataType.UInt16Array
+    elif type == MetricDataType.UInt32Array:
+        metric.datatype = MetricDataType.UInt32Array
+    elif type == MetricDataType.UInt64Array:
+        metric.datatype = MetricDataType.UInt64Array
+    elif type == MetricDataType.FloatArray:
+        metric.datatype = MetricDataType.FloatArray
+    elif type == MetricDataType.DoubleArray:
+        metric.datatype = MetricDataType.DoubleArray
+    elif type == MetricDataType.BooleanArray:
+        metric.datatype = MetricDataType.BooleanArray
+    elif type == MetricDataType.StringArray:
+        metric.datatype = MetricDataType.StringArray
+    elif type == MetricDataType.DateTimeArray:
+        metric.datatype = MetricDataType.DateTimeArray
     else:
         print( "Invalid: " + str(type))
 
