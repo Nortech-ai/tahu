@@ -133,61 +133,53 @@ export interface UPayload extends IPayload {
  *
  * only used during encode functions
  */
-function setValue(
-  type: number,
-  value: UserValue,
-  object: IMetric | IPropertyValue
-) {
-  // TODO not sure about type casts
-  switch (type) {
-    case 1: // Int8
-    case 2: // Int16
-    case 3: // Int32
-    case 5: // UInt8
-    case 6: // UInt16
-    case 7: // UInt32
-      object.intValue = value as number;
-      break;
-    case 4: // Int64
-    case 8: // UInt64
-    case 13: // DateTime
-      object.longValue = value as number | Long;
-      break;
-    case 9: // Float
-      object.floatValue = value as number;
-      break;
-    case 10: // Double
-      object.doubleValue = value as number;
-      break;
-    case 11: // Boolean
-      object.booleanValue = value as boolean;
-      break;
-    case 12: // String
-    case 14: // Text
-    case 15: // UUID
-      object.stringValue = value as string;
-      break;
-    case 16: // DataSet
-      (object as IMetric).datasetValue = encodeDataSet(value as UDataSet);
-      break;
-    case 17: // Bytes
-    case 18: // File
-      (object as IMetric).bytesValue = value as Uint8Array;
-      break;
-    case 19: // Template
-      (object as IMetric).templateValue = encodeTemplate(value as UTemplate);
-      break;
-    case 20: // PropertySet
-      (object as IPropertyValue).propertysetValue = encodePropertySet(
-        value as UPropertySet
-      );
-      break;
-    case 21:
-      (object as IPropertyValue).propertysetsValue = encodePropertySetList(
-        value as UPropertySetList
-      );
-      break;
-  }
+function setValue (type: number, value: UserValue, object: IMetric | IPropertyValue) {
+    // TODO not sure about type casts
+    switch (type) {
+        case 1: // Int8
+        case 2: // Int16
+        case 3: // Int32
+        case 5: // UInt8
+        case 6: // UInt16
+        case 7: // UInt32
+            object.intValue = value as number;
+            break;
+        case 4: // Int64
+        case 8: // UInt64
+        case 13: // DateTime
+            object.longValue = value as number | Long;
+            break;
+        case 9: // Float
+            object.floatValue = value as number;
+            break;
+        case 10: // Double
+            object.doubleValue = value as number;
+            break;
+        case 11: // Boolean
+            object.booleanValue = value as boolean;
+            break;
+        case 12: // String
+        case 14: // Text
+        case 15: // UUID
+            object.stringValue = value as string;
+            break;
+        case 16: // DataSet
+            (object as IMetric).datasetValue = encodeDataSet(value as UDataSet);
+            break;
+        case 17: // Bytes
+        case 18: // File
+            (object as IMetric).bytesValue = value as Uint8Array;
+            break;
+        case 19: // Template
+            (object as IMetric).templateValue = encodeTemplate(value as UTemplate);
+            break;
+        case 20: // PropertySet
+            (object as IPropertyValue).propertysetValue = encodePropertySet(value as UPropertySet);
+            break;
+        case 21:
+            (object as IPropertyValue).propertysetsValue = encodePropertySetList(value as UPropertySetList);
+            break;
+    } 
 }
 
 /** only used during decode functions */

@@ -59,8 +59,11 @@ public class TahuHostCallback implements ClientCallback {
 
 	private final PayloadDecoder<SparkplugBPayload> payloadDecoder;
 
+	private final String hostId;
+
 	public TahuHostCallback(HostApplicationEventHandler eventHandler, CommandPublisher commandPublisher,
-			SequenceReorderManager sequenceReorderManager, PayloadDecoder<SparkplugBPayload> payloadDecoder) {
+			SequenceReorderManager sequenceReorderManager, PayloadDecoder<SparkplugBPayload> payloadDecoder,
+			String hostId) {
 		this.eventHandler = eventHandler;
 		this.commandPublisher = commandPublisher;
 		if (sequenceReorderManager != null) {
@@ -72,6 +75,7 @@ public class TahuHostCallback implements ClientCallback {
 			this.sequenceReorderManager = null;
 		}
 		this.payloadDecoder = payloadDecoder;
+		this.hostId = hostId;
 
 		this.sparkplugBExecutors = new ThreadPoolExecutor[DEFAULT_NUM_OF_THREADS];
 		for (int i = 0; i < DEFAULT_NUM_OF_THREADS; i++) {
@@ -137,7 +141,8 @@ public class TahuHostCallback implements ClientCallback {
 					// This is a STATE message - handle as needed
 					ObjectMapper mapper = new ObjectMapper();
 					StatePayload statePayload = mapper.readValue(new String(message.getPayload()), StatePayload.class);
-					if (!statePayload.isOnline()) {
+					if (hostId != null && !hostId.trim().isEmpty() && splitTopic[2].equals(hostId)
+							&& !statePayload.isOnline()) {
 						// Make sure this isn't an OFFLINE message
 						logger.info(
 								"This is a offline STATE message from {} - correcting with new online STATE message",
@@ -196,6 +201,7 @@ public class TahuHostCallback implements ClientCallback {
 	public void connectionLost(MqttServerName mqttServerName, MqttServerUrl url, MqttClientId clientId,
 			Throwable cause) {
 		logger.warn("Connection Lost to - {} :: {} :: {}", mqttServerName, url, clientId);
+		eventHandler.onDisconnect();
 
 		if (cause != null) {
 			// We don't need to see all of the connection lost callbacks for clients
@@ -234,6 +240,7 @@ public class TahuHostCallback implements ClientCallback {
 	public void connectComplete(boolean reconnect, MqttServerName server, MqttServerUrl url, MqttClientId clientId) {
 //		// Update the ONLINE Engine Info tag for the client
 //		updateEngineInfoDateTag(server, DATE_ONLINE);
+		eventHandler.onConnect();
 	}
 
 	private void updateEngineInfoDateTag(MqttServerName server, String tagName) {

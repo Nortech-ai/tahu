@@ -486,8 +486,8 @@ public class TahuClient implements MqttCallbackExtended {
 			if (client != null) {
 				if (client.isConnected()) {
 					try {
-						logger.debug("{}: on connection to {} - Attempting to subscribe on topic {} with QoS={}",
-								getClientId(), getMqttServerName(), topic, qos);
+						logger.debug("{}: server {} - Attempting to subscribe on topic {} with QoS={}", getClientId(),
+								getMqttServerName(), topic, qos);
 						IMqttToken token = client.subscribe(topic, qos);
 						logger.trace("{}: Waiting for subscription on {}", getClientId(), topic);
 						token.waitForCompletion();
@@ -498,14 +498,14 @@ public class TahuClient implements MqttCallbackExtended {
 						if (grantedQos != null && grantedQos.length == 1) {
 							return grantedQos[0];
 						} else {
-							String errorMessage = getClientId() + ": on connection to " + getMqttServerName()
+							String errorMessage = getClientId() + ": server " + getMqttServerName()
 									+ " - Failed to subscribe to " + topic;
 							logger.error(errorMessage);
 							throw new TahuException(TahuErrorCode.NOT_AUTHORIZED, errorMessage);
 						}
 					} catch (MqttException e) {
-						logger.error(getClientId() + ": on connection to " + getMqttServerName()
-								+ " - Failed to subscribe to " + topic);
+						logger.error(getClientId() + ": server " + getMqttServerName() + " - Failed to subscribe to "
+								+ topic);
 						throw new TahuException(TahuErrorCode.INTERNAL_ERROR, e);
 					}
 				}
@@ -578,7 +578,8 @@ public class TahuClient implements MqttCallbackExtended {
 			if (client != null) {
 				if (client.isConnected()) {
 					try {
-						logger.debug("{}: Attempting to unsubscribe on topic {}", getClientId(), topic);
+						logger.debug("{}: {} attempting to unsubscribe on topic {}", getClientId(), mqttServerName,
+								topic);
 						client.unsubscribe(topic);
 					} catch (MqttException e) {
 						throw new TahuException(TahuErrorCode.INTERNAL_ERROR, e);
@@ -592,6 +593,11 @@ public class TahuClient implements MqttCallbackExtended {
 	@Override
 	public void connectionLost(Throwable cause) {
 		logger.debug("{}: MQTT connectionLost() to {} :: {}", getClientId(), getMqttServerName(), getMqttServerUrl());
+		if (logger.isTraceEnabled()) {
+			if (client != null) {
+				client.getDebug().dumpClientDebug();
+			}
+		}
 
 		// reset the timers if needed
 		if (getDisconnectTime() == null) {
@@ -938,6 +944,7 @@ public class TahuClient implements MqttCallbackExtended {
 								synchronized (clientLock) {
 									if (!attemptConnects) {
 										logger.info("{}: No longer attempting to connect", getClientId());
+										state.setInProgress(false);
 										return;
 									}
 
@@ -965,9 +972,12 @@ public class TahuClient implements MqttCallbackExtended {
 
 									// Check if the connect attempt has timed out
 									if (System.currentTimeMillis() - attemptTimestamp > connectAttemptTimeout) {
-										logger.warn("{}: Connect attempt has timed out");
-										// Forcibly disconnect the client
-										client.disconnectForcibly(500);
+										synchronized (clientLock) {
+											// Forcibly close the client
+											logger.warn("{}: Connect attempt has timed out - forcing close",
+													getClientId());
+											client.close(true);
+										}
 									} else {
 										Thread.sleep(500);
 									}
@@ -981,20 +991,26 @@ public class TahuClient implements MqttCallbackExtended {
 
 						logger.info("{}: MQTT Client connected to {} on thread {}", getClientId(), getMqttServerUrl(),
 								Thread.currentThread().getName());
+						state.setInProgress(false);
 					} catch (InterruptedException ie) {
 						logger.info("{}: Connect thread 2 interrupted - giving up", getClientId());
+						state.setInProgress(false);
 						return;
 					} catch (Throwable throwable) {
-						logException("Error while attempting connect to " + getMqttServerUrl(), throwable);
-					} finally {
-						logger.debug("{}: Setting connectAttemptInProgress to false", getClientId());
+						logException(
+								"Error while attempting connect (with autoReconnect=true) to " + getMqttServerUrl(),
+								throwable);
 						state.setInProgress(false);
+						if (autoReconnect && !isConnected() && attemptConnects) {
+							attemptRecovery();
+						}
 					}
 				} else {
 					try {
 						synchronized (clientLock) {
 							if (!attemptConnects) {
 								logger.info("{}: No longer attempting to connect", getClientId());
+								state.setInProgress(false);
 								return;
 							}
 
@@ -1002,35 +1018,40 @@ public class TahuClient implements MqttCallbackExtended {
 							attemptConnect(client, connectOptions, "connect");
 						}
 					} catch (Throwable throwable) {
-						logException("Error while attempting connect to " + getMqttServerUrl(), throwable);
+						logException(
+								"Error while attempting connect (with autoReconnect=false) to " + getMqttServerUrl(),
+								throwable);
 					}
 				}
 			} catch (Exception e) {
 				logger.error("{}: Error while connecting client", getClientId(), e);
 				state.setInProgress(false);
-
-				if (autoReconnect) {
-					logger.warn("{}: Connect failed - retrying", getClientId());
-					try {
-						if (randomStartupDelay != null && randomStartupDelay.isValid()) {
-							long randomDelay = randomStartupDelay.getRandomDelay();
-							logger.info("{}: Sleeping {} before reconnect attempt", getClientId(), randomDelay);
-							Thread.sleep(randomDelay);
-						} else {
-							Thread.sleep(getConnectRetryInterval());
-						}
-					} catch (InterruptedException ie) {
-						logger.warn("{}: InterruptedException while preparing to reconnect", getClientId(), ie);
-						return;
-					}
-					if (autoReconnect) {
-						connect();
-					} else {
-						logger.warn("{}: AutoReconnect canceled - No longer going to retry", getClientId());
-						return;
-					}
+				if (autoReconnect && !isConnected() && attemptConnects) {
+					attemptRecovery();
 				}
 			}
+		}
+	}
+
+	private void attemptRecovery() {
+		logger.warn("{}: Connect failed - retrying", getClientId());
+		try {
+			if (randomStartupDelay != null && randomStartupDelay.isValid()) {
+				long randomDelay = randomStartupDelay.getRandomDelay();
+				logger.info("{}: Sleeping {} before reconnect attempt", getClientId(), randomDelay);
+				Thread.sleep(randomDelay);
+			} else {
+				Thread.sleep(getConnectRetryInterval());
+			}
+		} catch (InterruptedException ie) {
+			logger.warn("{}: InterruptedException while preparing to reconnect", getClientId(), ie);
+			return;
+		}
+		if (autoReconnect) {
+			connect();
+		} else {
+			logger.warn("{}: AutoReconnect canceled - No longer going to retry", getClientId());
+			return;
 		}
 	}
 
@@ -1233,41 +1254,60 @@ public class TahuClient implements MqttCallbackExtended {
 
 					String topicStr = Arrays.toString(topics);
 					String qosStr = Arrays.toString(qosLevels);
-					logger.debug("{}: on connection to {} - Attempting to subscribe on topic {} with QoS={}",
-							getClientId(), getMqttServerName(), topicStr, qosStr);
+					logger.debug("{}: server {} - Attempting to subscribe on topic {} with QoS={}", getClientId(),
+							getMqttServerName(), topicStr, qosStr);
 					try {
-						IMqttToken token = client.subscribe(topics, qosLevels);
-						logger.trace("{}: Waiting for subscription on {}", getClientId(), topicStr);
-						token.waitForCompletion();
-						logger.trace("{}: Done waiting for subscription on {}", getClientId(), topicStr);
-						int[] grantedQos = token.getGrantedQos();
-						if (Arrays.equals(qosLevels, grantedQos)) {
-							logger.debug("{}: on connection to {} - Successfully subscribed on {} on QoS={}",
-									getClientId(), getMqttServerName(), topicStr, qosStr);
-						} else {
-							try {
-								logger.error("{}: on connection to {} - Failed to subscribe on {} - forcing disconnect",
-										getClientId(), getMqttServerName(), topicStr);
+						client.subscribe(topics, qosLevels, null, new IMqttActionListener() {
+							@Override
+							public void onSuccess(IMqttToken asyncActionToken) {
+								int[] grantedQos = asyncActionToken.getGrantedQos();
+								if (Arrays.equals(qosLevels, grantedQos)) {
+									logger.debug("{}: server {} - Successfully subscribed on {} on QoS={}",
+											getClientId(), getMqttServerName(), topicStr, qosStr);
+								} else {
+									try {
+										String grantedQosStr = Arrays.toString(grantedQos);
+										logger.error("{}: server {} - Failed subscribe on {} granted QoS {} != {}",
+												getClientId(), getMqttServerName(), topicStr, qosStr, grantedQosStr);
 
-								// FIXME - remove This sleep is necessary due to:
-								// https://github.com/eclipse/paho.mqtt.java/issues/850
-								Thread.sleep(1000);
+										// FIXME - remove This sleep is necessary due to:
+										// https://github.com/eclipse/paho.mqtt.java/issues/850
+										Thread.sleep(1000);
 
-								// Force the disconnect and return
-								client.disconnectForcibly(0, 1, false);
-								return;
-							} catch (Exception e) {
-								logger.error("{}: on connection to {} - Failed to disconnect on failed subscription",
-										getClientId(), getMqttServerName(), e);
-								break;
+										synchronized (clientLock) {
+											// Force the disconnect and return
+											client.disconnectForcibly(0, 1, false);
+										}
+										return;
+									} catch (Exception e) {
+										logger.error(
+												"{}: server {} - Failed disconnect on failed subscribe granted QoS",
+												getClientId(), getMqttServerName(), e);
+									}
+								}
 							}
-						}
+
+							@Override
+							public void onFailure(IMqttToken asyncActionToken, Throwable exception) {
+								synchronized (clientLock) {
+									try {
+										logger.error("{}: server {} - Failed to subscribe on {}",
+												getClientId(), getMqttServerName(), topicStr);
+										client.disconnectForcibly(0, 1, false);
+									} catch (MqttException e) {
+										logger.error("{}: server {} - Failed disconnect on failed subscribe",
+												getClientId(), getMqttServerName(), e);
+									}
+								}
+							}
+
+						});
 					} catch (MqttException e) {
-						logger.error("{}: on connection to {} - Failed to subscribe on {} with QoS={}", getClientId(),
+						logger.error("{}: server {} - Failed to subscribe on {} with QoS={}", getClientId(),
 								getMqttServerName(), topicStr, qosStr, e);
 						break;
 					}
-					
+
 					subscribedCount += size;
 
 				}

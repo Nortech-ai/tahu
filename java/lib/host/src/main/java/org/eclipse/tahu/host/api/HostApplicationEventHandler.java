@@ -21,29 +21,33 @@ import org.eclipse.tahu.message.model.SparkplugDescriptor;
 
 public interface HostApplicationEventHandler {
 
+	public void onConnect();
+
+	public void onDisconnect();
+
 	public void onMessage(SparkplugDescriptor sparkplugDescriptor, Message message);
 
-	public void onNodeBirthArrived(EdgeNodeDescriptor edgeNodeDescriptor);
+	public void onNodeBirthArrived(EdgeNodeDescriptor edgeNodeDescriptor, Message message);
 
 	public void onNodeBirthComplete(EdgeNodeDescriptor edgeNodeDescriptor);
 
-	public void onNodeDataArrived(EdgeNodeDescriptor edgeNodeDescriptor);
+	public void onNodeDataArrived(EdgeNodeDescriptor edgeNodeDescriptor, Message message);
 
 	public void onNodeDataComplete(EdgeNodeDescriptor edgeNodeDescriptor);
 
-	public void onNodeDeath(EdgeNodeDescriptor edgeNodeDescriptor);
+	public void onNodeDeath(EdgeNodeDescriptor edgeNodeDescriptor, Message message);
 
 	public void onNodeDeathComplete(EdgeNodeDescriptor edgeNodeDescriptor);
 
-	public void onDeviceBirthArrived(DeviceDescriptor deviceDescriptor);
+	public void onDeviceBirthArrived(DeviceDescriptor deviceDescriptor, Message message);
 
 	public void onDeviceBirthComplete(DeviceDescriptor deviceDescriptor);
 
-	public void onDeviceDataArrived(DeviceDescriptor deviceDescriptor);
+	public void onDeviceDataArrived(DeviceDescriptor deviceDescriptor, Message message);
 
 	public void onDeviceDataComplete(DeviceDescriptor deviceDescriptor);
 
-	public void onDeviceDeath(DeviceDescriptor deviceDescriptor);
+	public void onDeviceDeath(DeviceDescriptor deviceDescriptor, Message message);
 
 	public void onDeviceDeathComplete(DeviceDescriptor deviceDescriptor);
 
