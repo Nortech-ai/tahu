@@ -10,7 +10,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nortech.ai/tahu.git"
+    "url": "git+https://github.com/Nortech-ai/tahu.git",
+    "directory": "javascript/core/sparkplug-client"
   },
   "keywords": [
     "tahu",
@@ -19,10 +20,7 @@
   ],
   "author": "Chad Kienle <chad.kienle@cirrus-link.com> (http://www.cirrus-link.com)",
   "license": "EPL-2.0",
-  "bugs": {
-    "url": "https://github.com/nortech.ai/tahu/issues"
-  },
-  "homepage": "https://github.com/nortech.ai/tahu",
+  "homepage": "https://github.com/Nortech-ai/tahu",
   "files": [
     "index.js",
     "index.js.map",
