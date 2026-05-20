@@ -32,13 +32,13 @@
     "debug": "^4.3.4",
     "mqtt": "^5.12.1",
     "pako": "^2.0.4",
-    "@nortech/sparkplug-payload": "^1.0.3"
+    "@nortech/sparkplug-payload": "^1.1.0"
   },
   "devDependencies": {
     "@types/debug": "^4.1.7",
     "@types/node": "^16.11.7",
     "@types/pako": "^2.0.0",
-    "protobufjs": "^6.11.3",
+    "protobufjs": "^7.5.9",
     "typescript": "^4.6.3"
   }
 }
