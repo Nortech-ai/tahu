@@ -1,6 +1,8 @@
 Sparkplug Client
 =========
 
+> **Fork:** This package is published on npm as [`@nortech/sparkplug-client`](https://www.npmjs.com/package/@nortech/sparkplug-client), maintained by [Nortech AI](https://github.com/Nortech-ai) as a fork of Eclipse Tahu [`sparkplug-client`](https://www.npmjs.com/package/sparkplug-client). Upstream project: [eclipse/tahu](https://github.com/eclipse/tahu). Source for this package: [`javascript/core/sparkplug-client`](https://github.com/Nortech-ai/tahu/tree/master/javascript/core/sparkplug-client) in the [Nortech AI tahu](https://github.com/Nortech-ai/tahu) repository.
+
 A client library providing a MQTT client for MQTT device communication using
 the Sparkplug Specification from Cirrus Link Solutions.  
 
@@ -18,7 +20,16 @@ that have been sent from another MQTT client.
 
 ## Installation
 
-  npm install sparkplug-client
+```bash
+npm install @nortech/sparkplug-client
+```
+
+If you use the upstream unscoped package, switch the dependency and module path:
+
+| Upstream | This fork |
+|----------|-----------|
+| `npm install sparkplug-client` | `npm install @nortech/sparkplug-client` |
+| `require('sparkplug-client')` | `require('@nortech/sparkplug-client')` |
 
 ## Usage
 
@@ -44,7 +55,7 @@ must contain the following properties:
 Here is a code example of creating and configuring a new client:
 
 ```javascript
-var sparkplug = require('sparkplug-client'),
+var sparkplug = require('@nortech/sparkplug-client'),
     config = {
         'serverUrl' : 'tcp://localhost:1883',
         'username' : 'username',
@@ -445,3 +456,5 @@ which accompanies this distribution, and is available at
 http://www.eclipse.org/legal/epl-v10.html
 
 Contributors: Cirrus Link Solutions and others
+
+This fork is maintained by Nortech AI. It is not the official Eclipse Tahu npm package.
