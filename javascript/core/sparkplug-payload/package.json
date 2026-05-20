@@ -1,6 +1,6 @@
 {
   "name": "@nortech/sparkplug-payload",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "A library for encoding and decoding Sparkplug payloads",
   "main": "index.js",
   "scripts": {
@@ -34,7 +34,7 @@
   "dependencies": {
     "@types/long": "^4.0.0",
     "long": "^4.0.0",
-    "protobufjs": "^6.11.3"
+    "protobufjs": "^7.5.9"
   },
   "devDependencies": {
     "@types/node": "^16.11.29",
